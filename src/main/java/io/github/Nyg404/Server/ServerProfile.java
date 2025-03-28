@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServerProfile {
     private final Long serverId;
     private final String prefix;
-    private static final String selectServer = "SELECT * FROM servers WHERE serverid + ?";
+    private static final String selectServer = "SELECT * FROM servers WHERE serverid = ?";
+    private static final String selectPrefix = "SELECT prefix FROM servers WHERE serverid = ?";
     private static final ConcurrentHashMap<Long, ServerProfile> cacheServer = new ConcurrentHashMap<>();
-
     public ServerProfile(Long serverId, String prefix) {
         this.serverId = serverId;
         this.prefix = prefix;
@@ -44,6 +44,49 @@ public class ServerProfile {
                 log.error("Ошибка при получении сервера: ", e);
             }
             return serverProfil1;
+        });
+    }
+
+    public static CompletableFuture<String> getPrefix(long serverId) {
+        ServerProfile cache = cacheServer.get(serverId);
+        if (cache != null) {
+            return CompletableFuture.completedFuture(cache.getPrefix());
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection connection = DBConnection.getConnection()) {
+                try (PreparedStatement prsm = connection.prepareStatement(selectPrefix)) {
+                    prsm.setLong(1, serverId);
+                    try (ResultSet rs = prsm.executeQuery()) {
+                        if (rs.next()) {
+                            String prefix = rs.getString("prefix");
+                            cacheServer.putIfAbsent(serverId, new ServerProfile(serverId, prefix));
+                            return prefix;
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                log.error("Ошибка при получении префикса", e);
+            }
+            return null; // Значение по умолчанию, если не найдено
+        }).exceptionally(e -> {
+            log.error("Ошибка в CompletableFuture", e);
+            return null; // Дефолтное значение при ошибке
+        });
+    }    
+
+    public static CompletableFuture<ServerProfile> createIfNotExists(long serverId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO servers (serverid, prefix) VALUES (?, ?) ON CONFLICT DO NOTHING")) {
+                ps.setLong(1, serverId);
+                ps.setString(2, "/");
+                ps.executeUpdate();
+                return new ServerProfile(serverId, "/");
+            } catch (SQLException e) {
+                log.error("Error creating server", e);
+                return null;
+            }
         });
     }
 

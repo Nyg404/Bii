@@ -1,6 +1,7 @@
 package io.github.Nyg404.Command;
 
 import io.github.Nyg404.Account.UserAccount;
+import io.github.Nyg404.Server.ServerProfile;
 import io.github.Nyg404.Main;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-import static io.github.Nyg404.Command.CommandManager.PREFIX;
+
 
 
 @Getter
@@ -20,29 +21,49 @@ import static io.github.Nyg404.Command.CommandManager.PREFIX;
 public class CommandContext {
     private final Chat chat;
     private final CompletableFuture<UserAccount> userId;
-    private final String command;
-    private final List<String> args;
+    private String command;
+    private List<String> args;
     private final int messageId;
-
-    public CommandContext(Message message) {
-        this.chat = message.getChat();
-        this.userId = UserAccount.of(message.getFrom().getId(), message.getChatId());
-        this.messageId = message.getMessageId();
-
-        String text = message.getText();
-
-        // Проверка на наличие префикса
-        if (text.startsWith(PREFIX)) {
-            // Убираем префикс
-            String[] parts = text.substring(PREFIX.length()).split("\\s+", 2);
-            this.command = parts[0];
-            this.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
-        } else {
-            this.command = null;  // Если нет префикса, то команда считается невалидной
-            this.args = List.of();
-        }
+    
+    private CommandContext(Chat chat, int messageId, long userIdValue, long chatIdValue) {
+        this.chat = chat;
+        this.userId = UserAccount.of(userIdValue, chatIdValue);
+        this.messageId = messageId;
+        this.command = null;
+        this.args = List.of();
     }
+    
 
+    public static CompletableFuture<CommandContext> createCommandContext(Message message) {
+        CommandContext context = new CommandContext(
+        message.getChat(), 
+        message.getMessageId(), 
+        message.getFrom().getId(), 
+        message.getChatId()
+        );
+        
+        return ServerProfile.getPrefix(message.getChatId())
+                .thenApply(prefix -> {
+                    if (prefix == null) {
+                        prefix = "/";
+                        context.sendMessage("Не удалось получить префикс. Обратитесь к разработчику. \n Будет использоваться стандартный префикс /");
+                        return context;
+                    }
+                    
+                    String text = message.getText();
+                    if (text.startsWith(prefix)) {
+                        String[] parts = text.substring(prefix.length()).split("\\s+", 2);
+                        context.command = parts[0];
+                        context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
+                    } else {
+                        context.command = null;
+                        context.args = List.of();
+                    }
+
+                    return context;
+                });
+    }
+    
     public void sendMessage(String text) {
         SendMessage sendMessage = SendMessage.builder()
                 .chatId(chat.getId().toString())
@@ -80,5 +101,4 @@ public class CommandContext {
             log.error("Ошибка отправки сообщения с клавиатурой в чат {}: {}", chat.getId(), e.getMessage());
         }
     }
-
 }

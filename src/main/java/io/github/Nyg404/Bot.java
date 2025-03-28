@@ -5,6 +5,8 @@ import io.github.Nyg404.Command.CommandContext;
 import io.github.Nyg404.Command.CommandManager;
 import io.github.Nyg404.Command.HelpCommand;
 import io.github.Nyg404.DataBase.DBTables;
+import io.github.Nyg404.Server.ServerProfile;
+
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -26,10 +28,14 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
 
     @Override
     public void consume(Update update) {
-        // Получаем контекст и выполняем команду
-        CommandContext context = new CommandContext(update.getMessage());
-        CommandManager.getInstance().executeCommand(context);
-    }
+        if(update.hasMessage() && update.getMessage().hasText()){
+            ServerProfile.createIfNotExists(update.getMessage().getChatId());
+        }
+        
+        CommandContext.createCommandContext(update.getMessage())
+            .thenAccept(context -> CommandManager.getInstance().executeCommand(context));
+}
+
 
     public OkHttpTelegramClient getClient() {
         return okHttpTelegramClient;
