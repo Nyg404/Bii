@@ -23,40 +23,53 @@ public class CommandContext {
     private String command;
     private List<String> args;
     private final int messageId;
+    private final Integer replyToMessageId;
+    private final Long repliedUserId;
+    private final String repliedUserName;
+
+
+
     
-    private CommandContext(Chat chat, int messageId, long userIdValue, long chatIdValue) {
+    private CommandContext(Chat chat, int messageId, long userIdValue, long chatIdValue, Integer replyToMessageId, Long repliedUserId, String repliedUserName) {
         this.chat = chat;
         this.userId = UserAccount.of(userIdValue, chatIdValue);
         this.messageId = messageId;
         this.command = null;
         this.args = List.of();
+        this.replyToMessageId = replyToMessageId;
+        this.repliedUserId = repliedUserId;
+        this.repliedUserName = repliedUserName;
     }
+    
+    
     
 
     public static CompletableFuture<CommandContext> createCommandContext(Message message) {
+        Integer replyToMessageId = (message.isReply()) ? message.getReplyToMessage().getMessageId() : null;
+        Long repliedUserId = (message.isReply()) ? message.getReplyToMessage().getFrom().getId() : null;
+        String repliedUserName = (message.isReply()) ? message.getReplyToMessage().getFrom().getUserName() : null;
+    
         CommandContext context = new CommandContext(
             message.getChat(),
             message.getMessageId(),
             message.getFrom().getId(),
-            message.getChatId()
+            message.getChatId(),
+            replyToMessageId,
+            repliedUserId,
+            repliedUserName
         );
-        
+    
         return ServerProfile.of(message.getChatId()).thenApply(serverProfile -> {
-            // Извлекаем актуальный префикс из БД или используем значение по умолчанию
             String currentPrefix = (serverProfile != null) ? serverProfile.getPrefix() : "/";
             String text = message.getText();
-            final String defaultPrefix = "/"; // для команды updateprefix
-            
+            final String defaultPrefix = "/";
+    
             if (text != null) {
-                // Если команда updateprefix вызывается с дефолтным префиксом "/"
-                if (text.startsWith(defaultPrefix) && 
-                    text.substring(defaultPrefix.length()).toLowerCase().startsWith("updateprefix")) {
+                if (text.startsWith(defaultPrefix) && text.substring(defaultPrefix.length()).toLowerCase().startsWith("updateprefix")) {
                     String[] parts = text.substring(defaultPrefix.length()).split("\\s+", 2);
                     context.command = parts[0];
                     context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
-                }
-                // Иначе, используем актуальный префикс из БД для остальных команд
-                else if (text.startsWith(currentPrefix)) {
+                } else if (text.startsWith(currentPrefix)) {
                     String[] parts = text.substring(currentPrefix.length()).split("\\s+", 2);
                     context.command = parts[0];
                     context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
@@ -65,10 +78,11 @@ public class CommandContext {
                     context.args = List.of();
                 }
             }
-            
+    
             return context;
         });
     }
+       
        
     
 
@@ -110,4 +124,18 @@ public class CommandContext {
             log.error("Ошибка отправки сообщения с клавиатурой в чат {}: {}", chat.getId(), e.getMessage());
         }
     }
+    
+    public boolean isReplyToAnotherUser() {
+        if (replyToMessageId == null || repliedUserId == null) {
+            return false; 
+        }
+        return !repliedUserId.equals(userId.join()); 
+    }
+    
+    public String getRepliedUserName() {
+        return repliedUserName != null ? repliedUserName : "Неизвестный пользователь";
+    }
+    
+    
+    
 }
