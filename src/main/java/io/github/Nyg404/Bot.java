@@ -1,9 +1,9 @@
 package io.github.Nyg404;
 
-
 import io.github.Nyg404.Command.CommandContext;
 import io.github.Nyg404.Command.CommandManager;
 import io.github.Nyg404.Command.HelpCommand;
+import io.github.Nyg404.Command.ServerCommand.UpdatePrefix;
 import io.github.Nyg404.DataBase.DBTables;
 import io.github.Nyg404.Server.ServerProfile;
 
@@ -24,6 +24,7 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
         // Получаем единственный экземпляр CommandManager
         CommandManager commandManager = CommandManager.getInstance();
         commandManager.registerCommand("help", new HelpCommand());
+        commandManager.registerCommand("updateprefix", new UpdatePrefix());
     }
 
     @Override

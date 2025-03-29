@@ -10,11 +10,11 @@ public class CommandManager {
     protected static final String PREFIX = "/";
     private static CommandManager instance;
 
-    // Приватный конструктор
+
     private CommandManager() {
     }
 
-    // Метод для получения экземпляра (синглтон)
+
     public static CommandManager getInstance() {
         if (instance == null) {
             synchronized (CommandManager.class) {
@@ -38,6 +38,7 @@ public class CommandManager {
         CommandExecutor executor = commands.get(context.getCommand().toLowerCase());
         if (executor != null) {
             executor.execute(context);
+            log.info("Выполнение команды: {}", context.getCommand());
         } else {
             context.sendMessage("Неизвестная команда: " + context.getCommand());
             log.warn("Попытка выполнить неизвестную команду: {}", context.getCommand());

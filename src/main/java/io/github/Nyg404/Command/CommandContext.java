@@ -15,7 +15,6 @@ import java.util.concurrent.CompletableFuture;
 
 
 
-
 @Getter
 @Slf4j
 public class CommandContext {
@@ -36,33 +35,43 @@ public class CommandContext {
 
     public static CompletableFuture<CommandContext> createCommandContext(Message message) {
         CommandContext context = new CommandContext(
-        message.getChat(), 
-        message.getMessageId(), 
-        message.getFrom().getId(), 
-        message.getChatId()
+            message.getChat(),
+            message.getMessageId(),
+            message.getFrom().getId(),
+            message.getChatId()
         );
         
-        return ServerProfile.getPrefix(message.getChatId())
-                .thenApply(prefix -> {
-                    if (prefix == null) {
-                        prefix = "/";
-                        context.sendMessage("Не удалось получить префикс. Обратитесь к разработчику. \n Будет использоваться стандартный префикс /");
-                        return context;
-                    }
-                    
-                    String text = message.getText();
-                    if (text.startsWith(prefix)) {
-                        String[] parts = text.substring(prefix.length()).split("\\s+", 2);
-                        context.command = parts[0];
-                        context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
-                    } else {
-                        context.command = null;
-                        context.args = List.of();
-                    }
-
-                    return context;
-                });
+        return ServerProfile.of(message.getChatId()).thenApply(serverProfile -> {
+            // Извлекаем актуальный префикс из БД или используем значение по умолчанию
+            String currentPrefix = (serverProfile != null) ? serverProfile.getPrefix() : "/";
+            String text = message.getText();
+            final String defaultPrefix = "/"; // для команды updateprefix
+            
+            if (text != null) {
+                // Если команда updateprefix вызывается с дефолтным префиксом "/"
+                if (text.startsWith(defaultPrefix) && 
+                    text.substring(defaultPrefix.length()).toLowerCase().startsWith("updateprefix")) {
+                    String[] parts = text.substring(defaultPrefix.length()).split("\\s+", 2);
+                    context.command = parts[0];
+                    context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
+                }
+                // Иначе, используем актуальный префикс из БД для остальных команд
+                else if (text.startsWith(currentPrefix)) {
+                    String[] parts = text.substring(currentPrefix.length()).split("\\s+", 2);
+                    context.command = parts[0];
+                    context.args = parts.length > 1 ? List.of(parts[1].split("\\s+")) : List.of();
+                } else {
+                    context.command = null;
+                    context.args = List.of();
+                }
+            }
+            
+            return context;
+        });
     }
+       
+    
+
     
     public void sendMessage(String text) {
         SendMessage sendMessage = SendMessage.builder()

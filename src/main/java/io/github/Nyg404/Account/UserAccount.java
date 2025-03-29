@@ -21,6 +21,7 @@ public class UserAccount {
     private static final ConcurrentHashMap<String, UserAccount> cacheUser = new ConcurrentHashMap<>();
 
     private static final String selectUser = "SELECT * FROM users WHERE userid = ? AND serverid = ?";
+    private static final String INSERT_USER_SQL = "INSERT INTO users(userid, serverid, perms_level) VALUES (?,?,?)";
 
 
     public UserAccount(long telegramUserId, long telegramUserIdOnServer, int permsLevel) {
@@ -59,4 +60,28 @@ public class UserAccount {
             return account;
         });
     }
+
+    public static CompletableFuture<Void> addUserAsync(long userId, long serverId, int perms_level) {
+        return CompletableFuture.runAsync(() -> {
+            try (Connection conn = DBConnection.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(INSERT_USER_SQL)) {
+   
+                ps.setLong(1, userId);
+                ps.setLong(2, serverId);
+                ps.setInt(3, perms_level);  // добавлен параметр perms_level
+   
+                if (ps.executeUpdate() > 0) {
+                    UserAccount userAccount = new UserAccount(userId, serverId, perms_level);
+                    cacheUser.put(cacheKey(userId, serverId), userAccount); // исправлено
+                }
+            } catch (SQLException e) {
+                log.error("User insert error [{}@{}]: {}", userId, serverId, e.getMessage());
+                throw new RuntimeException(e);
+            }
+        }).exceptionally(ex -> {
+            log.error("Async user add failed: {}", ex.getMessage());
+            return null;
+        });
+    }
+   
 }
