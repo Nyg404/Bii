@@ -16,7 +16,8 @@ public class DBTables {
             + "FOREIGN KEY (serverid) REFERENCES servers(serverid));";
     private static final String createTablesServer = "CREATE TABLE IF NOT EXISTS servers("
             + "serverid BIGINT PRIMARY KEY,"
-            + "prefix VARCHAR(1) NOT NULL);";
+            + "prefix VARCHAR(1) NOT NULL,"
+            + "slap_level BIGINT NOT NULL);";
     public static void createTables(){
         try (Connection connection = DBConnection.getConnection()){
             try (Statement prst = connection.createStatement()){

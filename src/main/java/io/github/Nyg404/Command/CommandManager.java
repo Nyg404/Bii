@@ -39,9 +39,6 @@ public class CommandManager {
         if (executor != null) {
             executor.execute(context);
             log.info("Выполнение команды: {}", context.getCommand());
-        } else {
-            context.sendMessage("Неизвестная команда: " + context.getCommand());
-            log.warn("Попытка выполнить неизвестную команду: {}", context.getCommand());
         }
     }
 

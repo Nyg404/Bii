@@ -5,6 +5,8 @@ import io.github.Nyg404.Server.ServerProfile;
 import io.github.Nyg404.Main;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+
+import org.telegram.telegrambots.meta.api.methods.ParseMode;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
@@ -26,11 +28,12 @@ public class CommandContext {
     private final Integer replyToMessageId;
     private final Long repliedUserId;
     private final String repliedUserName;
+    private final String callbackData;
 
 
 
     
-    private CommandContext(Chat chat, int messageId, long userIdValue, long chatIdValue, Integer replyToMessageId, Long repliedUserId, String repliedUserName) {
+    private CommandContext(Chat chat, int messageId, long userIdValue, long chatIdValue, Integer replyToMessageId, Long repliedUserId, String repliedUserName, String callbackData) {
         this.chat = chat;
         this.userId = UserAccount.of(userIdValue, chatIdValue);
         this.messageId = messageId;
@@ -39,12 +42,13 @@ public class CommandContext {
         this.replyToMessageId = replyToMessageId;
         this.repliedUserId = repliedUserId;
         this.repliedUserName = repliedUserName;
+        this.callbackData = callbackData;
     }
     
     
     
 
-    public static CompletableFuture<CommandContext> createCommandContext(Message message) {
+    public static CompletableFuture<CommandContext> createCommandContext(Message message, String callbackData) {
         Integer replyToMessageId = (message.isReply()) ? message.getReplyToMessage().getMessageId() : null;
         Long repliedUserId = (message.isReply()) ? message.getReplyToMessage().getFrom().getId() : null;
         String repliedUserName = (message.isReply()) ? message.getReplyToMessage().getFrom().getUserName() : null;
@@ -56,9 +60,12 @@ public class CommandContext {
             message.getChatId(),
             replyToMessageId,
             repliedUserId,
-            repliedUserName
+            repliedUserName,
+            callbackData
+        
         );
     
+        
         return ServerProfile.of(message.getChatId()).thenApply(serverProfile -> {
             String currentPrefix = (serverProfile != null) ? serverProfile.getPrefix() : "/";
             String text = message.getText();
@@ -82,15 +89,17 @@ public class CommandContext {
             return context;
         });
     }
-       
-       
-    
+
+    public static CompletableFuture<CommandContext> createForCallback(Message message, String callbackData) {
+        return createCommandContext(message, callbackData);
+    }
 
     
     public void sendMessage(String text) {
         SendMessage sendMessage = SendMessage.builder()
                 .chatId(chat.getId().toString())
                 .text(text)
+                .parseMode(ParseMode.MARKDOWN)
                 .build();
         try {
             Main.getBot().getClient().execute(sendMessage);
